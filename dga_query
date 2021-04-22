@@ -1,0 +1,16 @@
+DGA named domains using entropy and duration - Using Infoblox so you may need to adjust you sources and variables you will need requests and responses
+
+sourcetype=named AND DNSResp="NXDOMAIN" AND (DNSQType="A" OR DNSQType="TXT") 
+| rex field=DNSQuery "(?P<sub_domain>^.+)\.[^\.]+\.[^\.]+\z"
+| rex field=DNSQuery "(?P<named_domain>[^\.]+\.[^\.]{2,6}\z)"
+| eval sub_len=len(sub_domain)
+| eval nm_len=len(named_domain)
+| `ut_shannon(named_domain)`
+| eval nentropy = ut_shannon
+| eval nentropy = round(nentropy, 1)
+| where isnull(sub_len) AND nm_len >= 9 AND nentropy >= 2.5
+| stats min(_time) AS min_time max(_time) AS max_time values(nm_len) AS NM_Len values(sub_len) AS Sub_Len values(DNSQType) AS Type values(nentropy) AS NEntropy values(DNSResp) AS Response values(named_domain) AS NamedDomain dc(named_domain) AS Distinct_NDomains values(sub_domain) AS Subdomain dc(sub_domain) AS Distinct_SDomains count(DNSQuery) AS Total_Query by clientip
+| eval Duration = max_time - min_time
+| where (Distinct_NDomains >= 5 AND Total_Query >= 5) AND (Duration < 10000 AND Duration >= 100) 
+| table Duration clientip Type Response Subdomain Sub_Len NamedDomain NM_Len NEntropy Distinct_SDomains Distinct_NDomains Total_Query
+| sort - Total_Query
