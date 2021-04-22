@@ -1,3 +1,6 @@
+Looking for clear text passwords in the username field of Pulse VPN logs. It helps to have a standard username patten. The sub search is looking for a deviation. Date_Time is a macro to
+convert time to a format you prefer. So you will have to make the macro or use the convert time command there. 
+
 sourcetype=network_syslog "PulseSecure"
 [search sourcetype=network_syslog "PulseSecure" "Login failed using auth server" OR "Primary authentication failed" 
 | eval userlen = len(UserName)
