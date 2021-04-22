@@ -1,0 +1,13 @@
+sourcetype=network_syslog "PulseSecure"
+[search sourcetype=network_syslog "PulseSecure" "Login failed using auth server" OR "Primary authentication failed" 
+| eval userlen = len(UserName)
+| regex UserName!="^<Do not look for this sub search>$"
+| where userlen >= 8 
+| regex UserName="[[:digit:]]|[\s\!\@\#\$\%\^\&\*\(\)]"
+| table clientip]
+| eval unl=len(UserName)
+| eval pp=case(unl >= 8, UserName)
+| `Date_Time`
+| stats min(Date_Time) AS min_time max(Date_Time) AS max_time values(pp) AS Possible_Password values(UserName) AS UserAcct by clientip 
+| eval Time = min_time + " - " + max_time
+| table Time clientip Possible_Password UserAcct
