@@ -1,4 +1,4 @@
-Looking for clear text passwords in the username field. It helps to have a standard name patten. The sub search is looking for a deviation. Date_Time is a macro to
+Looking for clear text passwords in the username field of event 4768. It helps to have a standard username patten. The sub search is looking for a deviation. Date_Time is a macro to
 convert time to a format you prefer. So you will have to make the macro or use the convert time command there. 
 
 sourcetype="WinEventLog:Security" EventCode=4768
