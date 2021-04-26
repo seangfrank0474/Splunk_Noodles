@@ -1,0 +1,13 @@
+Audit Event - User has been created on multiple hosts.
+
+index=wineventlog sourcetype=wineventlog source="WinEventLog:Security" EventCode=4720 AND src_user!="*$"
+| rex field=user "^(CN|cn)\=(?<accountname>[^\,]+)\,"
+| eval user=if(isnotnull(accountname), accountname, user)
+| convert timeformat="%a %B %d %Y" ctime(_time) AS Date
+| streamstats count first(signature_id) as first_user_code last(signature_id) as last_user_code earliest(_time) as e_time latest(_time) as l_time by Date user
+| convert timeformat="%m/%d/%yT%H:%M:%S" ctime(e_time) AS e_time 
+| convert timeformat="%m/%d/%yT%H:%M:%S" ctime(l_time) AS l_time
+| stats count dc(dest_nt_host) as dc_host values(dc_env) as location earliest(e_time) as start_time latest(l_time) as end_time values(signature_id) as signature_id values(signature) as signature values(dest_nt_host) AS dest_nt_host values(dest_nt_domain) as dest_nt_domain by Date user src_user
+| eval signature=if(dc_host > 5, signature + " on multiple hosts. Please verify with the source user, " + src_user + ", that this action was legitimate and cross check for a SNOW ticket.", signature)
+| where dc_host > 5
+| table Date count dc_host signature_id signature start_time end_time location src_user user dest_nt_domain dest_nt_host
