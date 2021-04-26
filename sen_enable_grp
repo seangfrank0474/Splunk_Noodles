@@ -1,0 +1,14 @@
+Audit Event - User has been added to a securty enable group for adminstration.
+
+index=wineventlog sourcetype=wineventlog source="WinEventLog:Security" (EventCode=4720 OR ((EventCode=4728 OR EventCode=4732 OR EventCode=4756) AND user_group="*admin*")) AND user!="-" AND user!="*$*"
+| rex field=user "^(CN|cn)\=(?<accountname>[^\,]+)\,"
+| eval user=if(isnotnull(accountname), accountname, user)
+| convert timeformat="%a %B %d %Y" ctime(_time) AS Date
+| streamstats count first(signature_id) as first_user_code last(signature_id) as last_user_code earliest(_time) as e_time latest(_time) as l_time by Date src_user
+| convert timeformat="%m/%d/%yT%H:%M:%S" ctime(e_time) AS e_time 
+| convert timeformat="%m/%d/%yT%H:%M:%S" ctime(l_time) AS l_time
+| where ((first_user_code == 4720 AND last_user_code == 4732) OR (first_user_code == 4728 OR first_user_code == 4732 OR first_user_code == 4756))
+| eval signature=case((first_user_code == 4720 AND last_user_code == 4732), "New user," + user + ", and added to the " + user_group + " group.", (first_user_code == 4728 OR first_user_code == 4732 OR first_user_code == 4756), "Existing user, " + user + ", was added to the " + user_group + " group.")
+| stats count values(dc_env) as location earliest(e_time) as start_time latest(l_time) as end_time values(signature_id) as signature_id values(signature) as signature values(user_group) as user_group values(dest_nt_host) AS dest_nt_host values(user) as user values(first_user_code) as first_user_code values(last_user_code) as last_user_code by Date src_user dest_nt_domain
+| eval desc="User(s) has/have been added to security enabled adminstration group(s). Please verify with the source user, " + src_user + ", that this action was legitimate and cross check for a SNOW ticket related to this change."
+| table Date count signature_id first_user_code last_user_code signature desc start_time end_time location src_user user user_group dest_nt_domain dest_nt_host
