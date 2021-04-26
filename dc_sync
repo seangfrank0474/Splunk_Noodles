@@ -1,0 +1,9 @@
+Audit Event - Possible AD replication access granted to a standard user.
+
+index=wineventlog sourcetype=wineventlog source="WinEventLog:Security" ((EventCode=4662 AND (Access_Mask="0x100" OR Access_Mask="0x4000")) OR (EventCode=5136 AND LDAP_Display_Name="ntSecurityDescriptor") AND ("19195a5b-6da0-11d0-afd3-00c04fd930c9" OR "1131f6aa-9c07-11d1-f79f-00c04fc2dcd2" OR "1131f6ad-9c07-11d1-f79f-00c04fc2dcd2")) OR (EventCode=4742 AND Service_Principal_Names="*GC*")
+| convert timeformat="%FT%T" ctime(_time) AS format_time
+| regex DN!="(?:(DC|dc)=\d{1,3}\,(DC|dc)\=(\d{1,3}\.\d{1,3}\.\d{1,3}\.in\-addr\.arpa))\,.+"
+| rex field=Value "(O|o)\:(?<user_sid>S\-1\-5\-21\-\d+\-\d+\-\d+\-\d+)(G|g)\:"
+| eval signature=case(signature_id==4662 AND Access_Mask="0x4000", "Possible DCSync user enumeration - User: " + user + " / Access_Mask: " + Access_Mask + " / Object: " + Object_Name, signature_id==4662 AND Access_Mask="0x100", "Possible AD replication from a non machine account - User: " + user + " / Access_Mask: " + Access_Mask + " / Object: " + Object_Name, signature_id==5136, "Possible AD replication being granted to standard user - User: " + user + " / DN: " + DN + " SID: " + user_sid, signature_id==4742, "Possible AD replication via new service principle name - User: " + user + " / SPN: " + Service_Principal_Names)
+| stats count earliest(format_time) as start_time latest(format_time) as end_time values(dc_env) as location values(dest_nt_host) as dest_nt_host values(dest_nt_domain) as dest_nt_domain by user signature_id signature
+| table start_time end_time count location user dest_nt_host dest_nt_domain signature_id signature
