@@ -1,12 +1,13 @@
 Pass The Hash
 
-index="wineventlog" sourcetype="wineventlog" eventtype="wineventlog_security"  AND (signature_id=4624 AND Logon_Type=3) AND Logon_Process=NtLmSsp AND Key_Length=128 
-    [ search index="wineventlog" sourcetype="wineventlog" eventtype="wineventlog_security" eventtype="wineventlog_security" AND signature_id=4776
-    | fields + src_nt_host
-    |search
-        [ search index="wineventlog" sourcetype="wineventlog" eventtype="wineventlog_security" eventtype="wineventlog_security" AND (signature_id=4624 AND Logon_Type=9 AND Authentication_Package=Negotiate AND Key_Length=0 AND Account_Name=SYSTEM AND Account_Domain="NT AUTHORITY")
-        | rex field=ComputerName "(?<src_nt_host>^[\w\d\-]+)\.?"
-        | fields + src_nt_host]]
+index="wineventlog" sourcetype="wineventlog" eventtype="wineventlog_security" AND (signature_id=4624 AND Logon_Type=3) AND Logon_Process=NtLmSsp AND Key_Length=128 [search index="wineventlog" sourcetype="wineventlog" eventtype="wineventlog_security" AND signature_id=4776 AND action="success" [ search index="wineventlog" sourcetype="wineventlog" eventtype="wineventlog_security" AND (signature_id=4624 AND Logon_Type=9 AND Authentication_Package=Negotiate AND Key_Length=0 AND Account_Name=SYSTEM AND Account_Domain="NT AUTHORITY" NOT (Process_Name=<Tune Processes> OR Network_Account_Name=<Tune Network Accounts>))
+        | eval src_nt_host=mvindex(split(ComputerName, "."), 0), user=Network_Account_Name
+        | dedup src_nt_host user
+        | fields src_nt_host user
+        | format]
+    | dedup src_nt_host user
+    | fields src_nt_host user
+    | format]
 | bin _time span=10m as ten_min_bin
 | convert timeformat="%FT%T" ctime(_time) AS c_time
 | stats count earliest(c_time) as start_time latest(c_time) as end_time values(dest_nt_domain) as dest_nt_domain values(signature) as signature values(src_nt_host) as src_nt_host values(dest) as dest by ten_min_bin src_ip user
