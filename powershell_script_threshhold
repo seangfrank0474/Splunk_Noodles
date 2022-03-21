@@ -1,0 +1,32 @@
+index=<windows event> source=<windows security event> (EventCode=4688)
+| search NOT 
+    [inputlookup Exclusion.csv 
+    | fields Creator_Process_Name Process_Command_Line
+    | format "(" "(" "OR" ")" "OR" ")"]
+| eval process=Process_Command_Line,
+    creator=Creator_Process_Name,
+    creator=if(isnull(creator) OR creator=="", "n/a", creator),
+    process=if(isnull(process) OR process=="", "n/a", process),
+    cmd_len=len(process),
+    user=lower(user), 
+    dest_nt_host=lower(dest_nt_host)
+| eventstats avg(cmd_len) as avg_len, stdev(cmd_len) as stdev_len by dest_nt_host
+| convert timeformat="%FT%T" ctime(_time) AS format_time
+| stats max(cmd_len) as max_len values(avg_len) as avg_len_host values(stdev_len) as stdev_len_host min(format_time) as start_time max(format_time) as end_time values(signature) as signature values(action) as action values(dc_env) as location values(src_nt_domain) as src_nt_domain values(signature_id) as signature_id  values(src) as src values(creator) as creator by user dest_nt_host process
+| eval threshold=round(3 * (stdev_len_host + avg_len_host)),
+    max_len=round(max_len),
+    avg_len_host=round(avg_len_host),
+    stdev_len_host=round(stdev_len_host),
+    dest_nt_domain=if((dest_nt_domain=="" OR isnull(dest_nt_domain)), "n/a", dest_nt_domain),
+    bypass_if=if(match(process, "(powershell\.exe.*?(?|\-[Nn]o[Pp]rofile|\-[Ee]xecution[Pp]olicy|[Bb]ypass)|(?|\-[Nn]o[Pp]rofile|\-[Ee]xecution[Pp]olicy|[Bb]ypass))"), 1, 0),
+    threshold_if=if(max_len > threshold, 1, 0),
+    severity=case((threshold_if==0 AND bypass_if==0), "Informational", (threshold_if==1 AND bypass_if==0), "medium", (threshold_if==0 AND bypass_if==1), "medium", (threshold_if==1 AND bypass_if==1), "high"),
+    priority=case((threshold_if==0 AND bypass_if==0), "Informational", (threshold_if==1 AND bypass_if==0), "high", (threshold_if==0 AND bypass_if==1), "high", (threshold_if==1 AND bypass_if==1), "high")
+| where (severity=="medium" OR severity=="high")
+| stats count dc(process) as dc_proc values(max_len) as max_len values(avg_len_host) as avg_len_host values(stdev_len_host) as stdev_len_host values(end_time) as end_time values(signature) as signature values(action) as action values(location) as location values(src_nt_domain) as src_nt_domain values(signature_id) as signature_id  values(dest_nt_domain) as dest_nt_domain values(threshold) as threshold values(bypass_if) as bypass_if values(threshold_if) as threshold_if values(creator) as creator by process user dest_nt_host severity priority start_time
+| eval process=mvindex(process, 0, 4), 
+    process=if(dc_proc >= 5 , mvappend(process,"...TRUNCATED TO FIVE VALUES. PLEASE CHECK CONTRIBUTING EVENTS FOR FULL DETAILS."), process),
+    event_desc=case((threshold_if==1 AND bypass_if==0), "A command line process has exceeded the threshold length. This could be an attepmt to run a malicous script in memory. Please investigate the event. Max Length: " + max_len + " Threshold Length: " + threshold, (threshold_if==0 AND bypass_if==1), "A powershell logging bypass has run from a command line process. This could be an attepmt to run a malicous powershell script. Please investigate the event. Max Length: " + max_len + " Threshold Length: " + threshold, (threshold_if==1 AND bypass_if==1), "A powershell bypass has run from a command line process and exceeded the threshold length. This could be an attepmt to run a malicous powershell script in memory. Please investigate the event. Max Length: " + max_len + " Threshold Length: " + threshold),
+    title_desc=case((threshold_if==1 AND bypass_if==0), "Threat Event - Script threshold length has been exceeded - " + user + " - " + location, (threshold_if==0 AND bypass_if==1), "Threat Event - Powershell Logging Bypass - " + user + " - " + location, (threshold_if==1 AND bypass_if==1), "Threat Event - Powershell Logging Bypass and has exceeded threshold length - " + user + " - " + location)
+| sort -max_len
+| table start_time end_time title_desc event_desc priority severity count dc_proc max_len avg_len_host stdev_len_host threshold bypass_if threshold_if location action signature_id signature dest_nt_domain src_nt_domain user dest_nt_host creator process
