@@ -6,3 +6,6 @@ Some standard regex patterns for Splunk and python
 (?<b64_eq>(?:[A-Za-z0-9+\/]{4}){2,}(?:[A-Za-z0-9+\/]{2}[AEIMQUYcgkosw048]=|[A-Za-z0-9+\/][AQgw]==))
 (?<b64_noeq>(?:[A-Za-z0-9+\/]{4}){2,}(?:[A-Za-z0-9+\/]{2}[AEIMQUYcgkosw048]=|[A-Za-z0-9+\/][AQgw]))
 (?<hash>(?:[0-9a-fA-F]{32,64}))
+
+Looking for encodedcommand in powershell
+^.+\s\-([Ee^]|[Ee^]{1,2}[NnCcOoDdEeMmAa^]+)\s\s?(?<data_to_decode>(?:[A-Za-z0-9+\/]{4})*(?:[A-Za-z0-9+\/]{4}|[A-Za-z0-9+\/]{3}=|[A-Za-z0-9+\/]{2}={2}))$
