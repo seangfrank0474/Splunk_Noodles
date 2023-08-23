@@ -1,6 +1,16 @@
 Some standard regex patterns for Splunk and python
 
+
+Also if you want to be protocol agnostic replace the http(s)? with [\w]+
+Regex just for aplphanumeric urls 
 (?<url>^(http(s)?\:\/\/)(([\w\-]+\.){0,}([\w\-]+\.[a-zA-Z]{1,63})))
+
+Regex to grab full alphanumeric urls, domains, and uri path on uri path
+^(?<full_url>http(s)?\:\/\/(?<full_domain>((?<sub_domain>([\w\-]+\.){0,})(?<domain>[\w\-]+\.(?<tld>[a-zA-Z]{1,63}))))\/?((?<uri>[\w\d\.\_\-\=\?\%\/]+)?))$
+
+Regex will grab the whole shabang including ipv4 and ipv6
+^(?<full_url>[\w]+\:\/\/(?<full_domain>(?<ipvsix>[\:a-fA-F0-9]+)|(?<ip>(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))|((?<sub_domain>([\w\-]+\.){0,})(?<domain>[\w\-]+\.(?<tld>[a-zA-Z]{1,63}))))((?<uri>[\w\d\.\_\-\=\?\%\/]+)?))$
+
 
 Regex just for complete domain - can be used in proxy logs, web logs, and dns query logs
 (?<domain>([\w\-]+\.){0,}([\w\-]+\.[a-zA-Z]{1,63}))
